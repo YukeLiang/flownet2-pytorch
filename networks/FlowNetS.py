@@ -11,12 +11,25 @@ import numpy as np
 
 from .submodules import *
 'Parameter count : 38,676,504 '
+class padding(nn.Module):
+    def __init__(self):
+        super(padding,self).__init__()
+        self.wpad = nn.ReplicationPad2d((0, -1, 0, 0))
+        self.hpad = nn.ReplicationPad2d((0, 0, 0, -1))
+
+    def forward(self, input, targetsize):
+        if input.size()[2] != targetsize[2]:
+            input = self.hpad(input)
+        if input.size()[3] != targetsize[3]:
+            input = self.wpad(input)
+        return input
 
 class FlowNetS(nn.Module):
     def __init__(self, args, input_channels = 12, batchNorm=True):
         super(FlowNetS,self).__init__()
 
         self.batchNorm = batchNorm
+        self.pad = padding()
         self.conv1   = conv(self.batchNorm,  input_channels,   64, kernel_size=7, stride=2)
         self.conv2   = conv(self.batchNorm,  64,  128, kernel_size=5, stride=2)
         self.conv3   = conv(self.batchNorm, 128,  256, kernel_size=5, stride=2)
@@ -69,12 +82,18 @@ class FlowNetS(nn.Module):
         flow6       = self.predict_flow6(out_conv6)
         flow6_up    = self.upsampled_flow6_to_5(flow6)
         out_deconv5 = self.deconv5(out_conv6)
-        
+        #pad
+        flow6_up = self.pad(flow6_up, out_conv5.size())
+        out_deconv5 = self.pad(out_deconv5, out_conv5.size())
+        #pad
         concat5 = torch.cat((out_conv5,out_deconv5,flow6_up),1)
         flow5       = self.predict_flow5(concat5)
         flow5_up    = self.upsampled_flow5_to_4(flow5)
         out_deconv4 = self.deconv4(concat5)
-        
+        #pad
+        flow5_up = self.pad(flow5_up, out_conv4.size())
+        out_deconv4 = self.pad(out_deconv4, out_conv4.size())
+        #pad
         concat4 = torch.cat((out_conv4,out_deconv4,flow5_up),1)
         flow4       = self.predict_flow4(concat4)
         flow4_up    = self.upsampled_flow4_to_3(flow4)

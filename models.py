@@ -16,6 +16,19 @@ from networks import FlowNetFusion
 from networks.submodules import *
 'Parameter count = 162,518,834'
 
+class padding(nn.Module):
+    def __init__(self):
+        super(padding,self).__init()
+        self.wpad = nn.ReplicationPad2d((0, -1, 0, 0))
+        self.hpad = nn.ReplicationPad2d((0, 0, 0, -1))
+
+    def forward(self, input, targetsize):
+        if input.size()[2] != targetsize[2]:
+            input = self.hpad(input)
+        if input.size()[3] != targetsize[3]:
+            input = self.wpad(input)
+        return input
+
 class FlowNet2(nn.Module):
 
     def __init__(self, args, batchNorm=False, div_flow = 20.):
@@ -216,7 +229,10 @@ class FlowNet2C(FlowNetC.FlowNetC):
         flow6       = self.predict_flow6(out_conv6)
         flow6_up    = self.upsampled_flow6_to_5(flow6)
         out_deconv5 = self.deconv5(out_conv6)
-
+        #pad
+        flow6_up = self.pad(flow6_up, out_conv5.size())
+        out_deconv5 = self.pad(out_deconv5, out_conv5.size())
+        #pad
         concat5 = torch.cat((out_conv5,out_deconv5,flow6_up),1)
 
         flow5       = self.predict_flow5(concat5)
